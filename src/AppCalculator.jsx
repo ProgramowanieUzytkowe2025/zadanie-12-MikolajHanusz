@@ -1,13 +1,84 @@
 import './AppCalculator.css';
-import { useState } from 'react';
+import { useState, useEffect, useReducer } from 'react';
 import { AppButton } from './AppButton';
 import { AppCalculationHistory } from './AppCalculationHistory';
+import { useFont } from './FontContext';
+import { useKalkulator } from './useKalkulator';
 
 export function AppCalculator() {
+    const { czcionka } = useFont();
     const [liczbaA, setLiczbaA] = useState(null);
     const [liczbaB, setLiczbaB] = useState(null);
     const [wynik, setWynik] = useState(null);
     const [historia, setHistoria] = useState([]);
+    const [comparison, setPorownanie] = useState('');
+
+    const zapiszStan = () => {
+        const stan = {
+        wynik,
+        historia,
+        liczbaA,
+        liczbaB,
+        komunikat,
+        };
+        sessionStorage.setItem('kalkulatorStan', JSON.stringify(stan));
+    };
+
+    const odczytajStan = () => {
+        const zapisanyStan = sessionStorage.getItem('kalkulatorStan');
+        if (zapisanyStan) {
+        const stan = JSON.parse(zapisanyStan);
+        setWynik(stan.wynik);
+        setHistoria(stan.historia);
+        setLiczbaA(stan.liczbaA);
+        setLiczbaB(stan.liczbaB);
+        }
+    };
+
+    useEffect(() => {
+    odczytajStan();
+    }, []);
+
+    const actionTypes = {
+        SET_A: 'SET_A',
+        SET_B: 'SET_B',
+        OBLICZENIE: 'OBLICZENIE',
+        PRZYWRÓĆ: 'PRZYWRÓĆ',
+    };
+
+    const komunikatReducer = (state, action) => {
+    switch (action.type) {
+    case actionTypes.SET_A:
+      return 'Zmodyfikowano wartość liczby A';
+    case actionTypes.SET_B:
+      return 'Zmodyfikowano wartość liczby B';
+    case actionTypes.OBLICZENIE:
+      return 'Wykonano obliczenia';
+    case actionTypes.PRZYWROC:
+      return 'Przywrócono historyczny stan';
+    default:
+      return 'Brak';
+    }
+    };
+
+    const [komunikat, dispatchKomunikat] = useReducer(komunikatReducer, 'Brak');
+     
+    const updatePorownanie = () => {
+        if (liczbaA && liczbaB) {
+            if (parseFloat(liczbaA) > parseFloat(liczbaB)) {
+                setPorownanie('Liczba A jest większa od liczby B');
+            } else if (parseFloat(liczbaA) < parseFloat(liczbaB)) {
+                setPorownanie('Liczba A jest mniejsza od liczby B');
+            } else {
+                setPorownanie('Liczba A jest równa liczbie B');
+            }
+        }
+    };
+
+    useEffect(() => {
+        updatePorownanie();
+    }, [liczbaA, liczbaB]);
+
 
     function dodaj() {
         aktualizujHistorie('+', liczbaA + liczbaB);
@@ -29,6 +100,9 @@ export function AppCalculator() {
 
     function liczbaAOnChange(value) {
         setLiczbaA(parsujLiczbe(value));
+        dispatchKomunikat({ type: actionTypes.SET_A });
+        zapiszStan();
+        console.log(sessionStorage)
     }
 
     function parsujLiczbe(value) {
@@ -42,6 +116,8 @@ export function AppCalculator() {
 
     function liczbaBOnChange(value) {
         setLiczbaB(parsujLiczbe(value));
+        dispatchKomunikat({ type: actionTypes.SET_B });
+        zapiszStan();
     }
 
     function onAppCalculationHistoryClick(index) {
@@ -50,35 +126,22 @@ export function AppCalculator() {
         setLiczbaA(historia[index].a);
         setLiczbaB(historia[index].b);
         setWynik(historia[index].wynik);
+        dispatchKomunikat({ type: actionTypes.PRZYWROC });
     }
 
     function aktualizujHistorie(operation, wynik) {
+        dispatchKomunikat({ type: actionTypes.OBLICZENIE });
         const nowaHistoria = [...historia, { a: liczbaA, b: liczbaB, operation: operation, wynik: wynik }];
         setHistoria(nowaHistoria);
         setWynik(wynik);
+        zapiszStan();
     }
 
-    let porownanie;
     let zablokujPrzyciski = liczbaA == null || liczbaB == null;
     let zablokujDzielenie = zablokujPrzyciski || liczbaB === 0;
 
-    if(zablokujPrzyciski) 
-    {
-        porownanie = '';
-    } 
-    else 
-    {
-        if(liczbaA === liczbaB) {
-            porownanie = 'Liczba A jest równa liczbie B.';
-        } else if(liczbaA > liczbaB) {
-            porownanie = 'Liczba A jest większa od liczby B.';
-        } else {
-            porownanie = 'Liczba B jest większa od liczby A.';
-        }
-    }
-
     return (
-    <div className='app-calculator'>
+    <div className='app-calculator' style={{ fontSize: czcionka }}>
         <div className='app-calculator-pole'>
             <label>Wynik: </label>
             <span>{wynik}</span>
@@ -88,17 +151,21 @@ export function AppCalculator() {
 
         <div className='app-calculator-pole'>
             <label>Dynamiczne porównanie liczb: </label>
-            <span>{porownanie}</span>
+            <input type="text" value={comparison} style={{ width: '300px' }} readOnly />
+        </div>
+        <div className='app-calculator-pole'>
+            <label>Ostatnia wykonana czynność</label>
+            <input type="text" value={komunikat} style={{ width: '300px' }} readOnly />
         </div>
 
         <hr />
 
         <div className='app-calculator-pole'>
-            <label htmlFor="liczba1">Liczba 1</label>
+            <label htmlFor="liczba1">Liczba A</label>
             <input id="liczba1" type="number" value={liczbaA} onChange={(e) => liczbaAOnChange(e.target.value)} name="liczba1" />
         </div>
         <div className='app-calculator-pole'>
-            <label htmlFor="liczba2">Liczba 2</label>
+            <label htmlFor="liczba2">Liczba B</label>
             <input id="liczba2" type="number" value={liczbaB} onChange={(e) => liczbaBOnChange(e.target.value)} name="liczba2" />
         </div>
 
